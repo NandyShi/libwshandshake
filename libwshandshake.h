@@ -1,64 +1,120 @@
 #ifndef LIBWSHANDSHAKE_H
 #define LIBWSHANDSHAKE_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include <cstdint>
+#include <cstddef>
 
-uint32_t lwsh_private_rol(uint32_t value, size_t bits) {return (value << bits) | (value >> (32 - bits));}
-uint32_t lwsh_private_blk(uint32_t block[16], size_t i) {
+inline uint32_t lwsh_private_rol(uint32_t value, size_t bits) {return (value << bits) | (value >> (32 - bits));}
+inline uint32_t lwsh_private_blk(uint32_t block[16], size_t i) {
     return lwsh_private_rol(block[(i + 13) & 15] ^ block[(i + 8) & 15] ^ block[(i + 2) & 15] ^ block[i], 1);
 }
 
-void lwsh_private_sha1(uint32_t digest[5], uint32_t block[16]) {
-    uint32_t vec[5] = {digest[4], digest[3], digest[2], digest[1], digest[0]};
-    for (int i = 0; i < 16; i++) {
-        uint32_t w = vec[(3 + i) % 5];
-        uint32_t y = vec[(1 + i) % 5];
-        vec[i % 5] += ((w & (vec[(2 + i) % 5] ^ y)) ^ y) + block[i] + 0x5a827999 + lwsh_private_rol(vec[(4 + i) % 5], 5);
-        vec[(3 + i) % 5] = lwsh_private_rol(w, 30);
+template <int i>
+struct First;
+template <>
+struct First<16> {
+    static inline void iterate(uint32_t *vec, uint32_t *block) {}
+};
+template <int i>
+struct First {
+    static inline void iterate(uint32_t *vec, uint32_t *block) {
+        vec[i % 5] += ((vec[(3 + i) % 5] & (vec[(2 + i) % 5] ^ vec[(1 + i) % 5])) ^ vec[(1 + i) % 5]) + block[i] + 0x5a827999 + lwsh_private_rol(vec[(4 + i) % 5], 5);
+        vec[(3 + i) % 5] = lwsh_private_rol(vec[(3 + i) % 5], 30);
+        First<i + 1>::iterate(vec, block);
     }
+};
 
-    for (int i = 1; i < 5; i++) {
-        uint32_t w = vec[(3 + i) % 5];
-        uint32_t y = vec[(1 + i) % 5];
+template <int i>
+struct Second;
+template <>
+struct Second<5> {
+    static inline void iterate(uint32_t *vec, uint32_t *block) {}
+};
+template <int i>
+struct Second {
+    static inline void iterate(uint32_t *vec, uint32_t *block) {
         block[i - 1] = lwsh_private_blk(block, i - 1);
-        vec[i % 5] += ((w & (vec[(2 + i) % 5] ^ y)) ^ y) + block[i - 1] + 0x5a827999 + lwsh_private_rol(vec[(4 + i) % 5], 5);
-        vec[(3 + i) % 5] = lwsh_private_rol(w, 30);
+        vec[i % 5] += ((vec[(3 + i) % 5] & (vec[(2 + i) % 5] ^ vec[(1 + i) % 5])) ^ vec[(1 + i) % 5]) + block[i - 1] + 0x5a827999 + lwsh_private_rol(vec[(4 + i) % 5], 5);
+        vec[(3 + i) % 5] = lwsh_private_rol(vec[(3 + i) % 5], 30);
+        Second<i + 1>::iterate(vec, block);
     }
+};
 
-    for (int i = 0; i < 20; i++) {
-        uint32_t w = vec[(3 + i) % 5];
-        uint32_t y = vec[(1 + i) % 5];
+template <int i>
+struct Third;
+template <>
+struct Third<20> {
+    static inline void iterate(uint32_t *vec, uint32_t *block) {}
+};
+template <int i>
+struct Third {
+    static inline void iterate(uint32_t *vec, uint32_t *block) {
         block[(i + 4) % 16] = lwsh_private_blk(block, (i + 4) % 16);
-        vec[i % 5] += (w ^ vec[(2 + i) % 5] ^ y) + block[(i + 4) % 16] + 0x6ed9eba1 + lwsh_private_rol(vec[(4 + i) % 5], 5);
-        vec[(3 + i) % 5] = lwsh_private_rol(w, 30);
+        vec[i % 5] += (vec[(3 + i) % 5] ^ vec[(2 + i) % 5] ^ vec[(1 + i) % 5]) + block[(i + 4) % 16] + 0x6ed9eba1 + lwsh_private_rol(vec[(4 + i) % 5], 5);
+        vec[(3 + i) % 5] = lwsh_private_rol(vec[(3 + i) % 5], 30);
+        Third<i + 1>::iterate(vec, block);
     }
+};
 
-    for (int i = 0; i < 20; i++) {
-        uint32_t w = vec[(3 + i) % 5];
-        uint32_t y = vec[(1 + i) % 5];
-        uint32_t x = vec[(2 + i) % 5];
+template <int i>
+struct Fourth;
+template <>
+struct Fourth<20> {
+    static inline void iterate(uint32_t *vec, uint32_t *block) {}
+};
+template <int i>
+struct Fourth {
+    static inline void iterate(uint32_t *vec, uint32_t *block) {
         block[(i + 8) % 16] = lwsh_private_blk(block, (i + 8) % 16);
-        vec[i % 5] += (((w | x) & y) | (w & x)) + block[(i + 8) % 16] + 0x8f1bbcdc + lwsh_private_rol(vec[(4 + i) % 5], 5);
-        vec[(3 + i) % 5] = lwsh_private_rol(w, 30);
+        vec[i % 5] += (((vec[(3 + i) % 5] | vec[(2 + i) % 5]) & vec[(1 + i) % 5]) | (vec[(3 + i) % 5] & vec[(2 + i) % 5])) + block[(i + 8) % 16] + 0x8f1bbcdc + lwsh_private_rol(vec[(4 + i) % 5], 5);
+        vec[(3 + i) % 5] = lwsh_private_rol(vec[(3 + i) % 5], 30);
+        Fourth<i + 1>::iterate(vec, block);
     }
+};
 
-    for (int i = 0; i < 20; i++) {
-        uint32_t w = vec[(3 + i) % 5];
-        uint32_t y = vec[(1 + i) % 5];
+template <int i>
+struct Fifth;
+template <>
+struct Fifth<20> {
+    static inline void iterate(uint32_t *vec, uint32_t *block) {}
+};
+template <int i>
+struct Fifth {
+    static inline void iterate(uint32_t *vec, uint32_t *block) {
         block[(i + 12) % 16] = lwsh_private_blk(block, (i + 12) % 16);
-        vec[i % 5] += (w ^ vec[(2 + i) % 5] ^ y) + block[(i + 12) % 16] + 0xca62c1d6 + lwsh_private_rol(vec[(4 + i) % 5], 5);
-        vec[(3 + i) % 5] = lwsh_private_rol(w, 30);
+        vec[i % 5] += (vec[(3 + i) % 5] ^ vec[(2 + i) % 5] ^ vec[(1 + i) % 5]) + block[(i + 12) % 16] + 0xca62c1d6 + lwsh_private_rol(vec[(4 + i) % 5], 5);
+        vec[(3 + i) % 5] = lwsh_private_rol(vec[(3 + i) % 5], 30);
+        Fifth<i + 1>::iterate(vec, block);
     }
+};
 
-    for (int i = 0; i < 5; i++) {
+template <int i>
+struct Last;
+template <>
+struct Last<-1> {
+    static inline void iterate(uint32_t *vec, uint32_t *digest) {}
+};
+template <int i>
+struct Last {
+    static inline void iterate(uint32_t *vec, uint32_t *digest) {
+        Last<i - 1>::iterate(vec, digest);
         digest[i] += vec[4 - i];
     }
+};
+
+inline void lwsh_private_sha1(uint32_t digest[5], uint32_t block[16]) {
+    uint32_t vec[5] = {digest[4], digest[3], digest[2], digest[1], digest[0]};
+    First<0>::iterate(vec, block);
+    Second<1>::iterate(vec, block);
+    Third<0>::iterate(vec, block);
+    Fourth<0>::iterate(vec, block);
+    Fifth<0>::iterate(vec, block);
+    Last<4>::iterate(vec, digest);
 }
 
-void lwsh_private_base64(unsigned char *src, char *dst)
+inline void lwsh_private_base64(unsigned char *src, char *dst)
 {
-    static const char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     for (int i = 0; i < 18; i += 3) {
         *dst++ = b64[(src[i] >> 2) & 63];
         *dst++ = b64[((src[i] & 3) << 4) | ((src[i + 1] & 240) >> 4)];
@@ -71,7 +127,7 @@ void lwsh_private_base64(unsigned char *src, char *dst)
     *dst++ = '=';
 }
 
-void lwsh_generate(char input[24], char output[28]) {
+inline void lwsh_generate(const char input[24], char output[28]) {
     uint32_t block_output[5] = {
         0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0
     };
