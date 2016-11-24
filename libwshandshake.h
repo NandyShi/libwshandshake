@@ -9,107 +9,79 @@ inline uint32_t lwsh_private_blk(uint32_t block[16], size_t i) {
     return lwsh_private_rol(block[(i + 13) & 15] ^ block[(i + 8) & 15] ^ block[(i + 2) & 15] ^ block[i], 1);
 }
 
-template <int i>
-struct First;
-template <>
-struct First<16> {
-    static inline void iterate(uint32_t *vec, uint32_t *block) {}
-};
-template <int i>
-struct First {
-    static inline void iterate(uint32_t *vec, uint32_t *block) {
+struct L1 {
+    template <int i>
+    static inline void f(uint32_t *vec, uint32_t *block) {
         vec[i % 5] += ((vec[(3 + i) % 5] & (vec[(2 + i) % 5] ^ vec[(1 + i) % 5])) ^ vec[(1 + i) % 5]) + block[i] + 0x5a827999 + lwsh_private_rol(vec[(4 + i) % 5], 5);
         vec[(3 + i) % 5] = lwsh_private_rol(vec[(3 + i) % 5], 30);
-        First<i + 1>::iterate(vec, block);
     }
 };
 
-template <int i>
-struct Second;
-template <>
-struct Second<5> {
-    static inline void iterate(uint32_t *vec, uint32_t *block) {}
-};
-template <int i>
-struct Second {
-    static inline void iterate(uint32_t *vec, uint32_t *block) {
+struct L2 {
+    template <int in>
+    static inline void f(uint32_t *vec, uint32_t *block) {
+        int i = in + 1;
         block[i - 1] = lwsh_private_blk(block, i - 1);
         vec[i % 5] += ((vec[(3 + i) % 5] & (vec[(2 + i) % 5] ^ vec[(1 + i) % 5])) ^ vec[(1 + i) % 5]) + block[i - 1] + 0x5a827999 + lwsh_private_rol(vec[(4 + i) % 5], 5);
         vec[(3 + i) % 5] = lwsh_private_rol(vec[(3 + i) % 5], 30);
-        Second<i + 1>::iterate(vec, block);
     }
 };
 
-template <int i>
-struct Third;
-template <>
-struct Third<20> {
-    static inline void iterate(uint32_t *vec, uint32_t *block) {}
-};
-template <int i>
-struct Third {
-    static inline void iterate(uint32_t *vec, uint32_t *block) {
+struct L3 {
+    template <int i>
+    static inline void f(uint32_t *vec, uint32_t *block) {
         block[(i + 4) % 16] = lwsh_private_blk(block, (i + 4) % 16);
         vec[i % 5] += (vec[(3 + i) % 5] ^ vec[(2 + i) % 5] ^ vec[(1 + i) % 5]) + block[(i + 4) % 16] + 0x6ed9eba1 + lwsh_private_rol(vec[(4 + i) % 5], 5);
         vec[(3 + i) % 5] = lwsh_private_rol(vec[(3 + i) % 5], 30);
-        Third<i + 1>::iterate(vec, block);
     }
 };
 
-template <int i>
-struct Fourth;
-template <>
-struct Fourth<20> {
-    static inline void iterate(uint32_t *vec, uint32_t *block) {}
-};
-template <int i>
-struct Fourth {
-    static inline void iterate(uint32_t *vec, uint32_t *block) {
+struct L4 {
+    template <int i>
+    static inline void f(uint32_t *vec, uint32_t *block) {
         block[(i + 8) % 16] = lwsh_private_blk(block, (i + 8) % 16);
         vec[i % 5] += (((vec[(3 + i) % 5] | vec[(2 + i) % 5]) & vec[(1 + i) % 5]) | (vec[(3 + i) % 5] & vec[(2 + i) % 5])) + block[(i + 8) % 16] + 0x8f1bbcdc + lwsh_private_rol(vec[(4 + i) % 5], 5);
         vec[(3 + i) % 5] = lwsh_private_rol(vec[(3 + i) % 5], 30);
-        Fourth<i + 1>::iterate(vec, block);
     }
 };
 
-template <int i>
-struct Fifth;
-template <>
-struct Fifth<20> {
-    static inline void iterate(uint32_t *vec, uint32_t *block) {}
-};
-template <int i>
-struct Fifth {
-    static inline void iterate(uint32_t *vec, uint32_t *block) {
+struct L5 {
+    template <int i>
+    static inline void f(uint32_t *vec, uint32_t *block) {
         block[(i + 12) % 16] = lwsh_private_blk(block, (i + 12) % 16);
         vec[i % 5] += (vec[(3 + i) % 5] ^ vec[(2 + i) % 5] ^ vec[(1 + i) % 5]) + block[(i + 12) % 16] + 0xca62c1d6 + lwsh_private_rol(vec[(4 + i) % 5], 5);
         vec[(3 + i) % 5] = lwsh_private_rol(vec[(3 + i) % 5], 30);
-        Fifth<i + 1>::iterate(vec, block);
     }
 };
 
-template <int i>
-struct Last;
-template <>
-struct Last<-1> {
-    static inline void iterate(uint32_t *vec, uint32_t *digest) {}
-};
-template <int i>
-struct Last {
-    static inline void iterate(uint32_t *vec, uint32_t *digest) {
-        Last<i - 1>::iterate(vec, digest);
+struct L6 {
+    template <int i>
+    static inline void f(uint32_t *vec, uint32_t *digest) {
         digest[i] += vec[4 - i];
     }
 };
 
+template <int N, typename T>
+struct static_for {
+    void operator()(uint32_t *vec, uint32_t *digest) {
+        static_for<N - 1, T>()(vec, digest);
+        T::template f<N - 1>(vec, digest);
+    }
+};
+
+template <typename T>
+struct static_for<0, T> {
+    void operator()(uint32_t *vec, uint32_t *digest) {}
+};
+
 inline void lwsh_private_sha1(uint32_t digest[5], uint32_t block[16]) {
     uint32_t vec[5] = {digest[4], digest[3], digest[2], digest[1], digest[0]};
-    First<0>::iterate(vec, block);
-    Second<1>::iterate(vec, block);
-    Third<0>::iterate(vec, block);
-    Fourth<0>::iterate(vec, block);
-    Fifth<0>::iterate(vec, block);
-    Last<4>::iterate(vec, digest);
+    static_for<16, L1>()(vec, block);
+    static_for<4, L2>()(vec, block);
+    static_for<20, L3>()(vec, block);
+    static_for<20, L4>()(vec, block);
+    static_for<20, L5>()(vec, block);
+    static_for<5, L6>()(vec, digest);
 }
 
 inline void lwsh_private_base64(unsigned char *src, char *dst)
