@@ -14,4 +14,4 @@ int main()
 }
 ```
 
-this would output: `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=` which of course is the response to send. Currently the performance is 4x as bad compared to OpenSSL.
+this would output: `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=` which of course is the response to send.
