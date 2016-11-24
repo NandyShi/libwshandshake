@@ -1,5 +1,5 @@
 # libwshandshake
-This repo tracks the development of a cross-platform standard C++ WebSocket handshake implementation. You want to get from the client's 20-byte base64 token to the server's 28 byte base64 response:
+This repo tracks the development of a cross-platform standard C++ WebSocket handshake implementation. You want to get from the client's 24-byte base64 token to the server's 28 byte base64 response:
 
 ```c++
 #include "libwshandshake.hpp"
