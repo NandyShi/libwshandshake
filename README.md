@@ -1,17 +1,16 @@
 # libwshandshake
-This repo tracks the development of a cross-platform standard C WebSocket handshake implementation. You want to get from the client's 20-byte base64 token to the server's 28 byte base64 response:
+This repo tracks the development of a cross-platform standard C++ WebSocket handshake implementation. You want to get from the client's 20-byte base64 token to the server's 28 byte base64 response:
 
 ```c
-#include "libwshandshake.h"
-#include <stdio.h>
-#include <string.h>
+#include "libwshandshake.hpp"
+#include <iostream>
 
 int main()
 {
     char output[29] = {};
-    lwsh_generate("dGhlIHNhbXBsZSBub25jZQ==", output);
-    printf("%s\n", output);
+    WebSocketHandshake::generate("dGhlIHNhbXBsZSBub25jZQ==", output);
+    std::cout << output << std::endl;
 }
 ```
 
-this would output: `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=` which of course is the response to send.
+this would output: `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=` which of course is the response to send. Performance has been an important factor in the development and should be on par with the equivalent OpenSSL alternative. One million handshakes can be performed in about 200 milliseconds on a modern CPU.
