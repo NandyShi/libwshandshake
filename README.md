@@ -14,4 +14,4 @@ int main()
 }
 ```
 
-This would output: `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=` which of course is the response to send. Performance has been an important factor of the development process and should be on par with the equivalent OpenSSL based alternatives. One million handshakes can be performed in about 200 milliseconds on a modern CPU.
+This would output: `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=` which of course is the response to send. Performance has been a factor of the development process and should be close to the equivalent OpenSSL based alternatives. One million handshakes can be performed in about 200 milliseconds on a modern CPU.
