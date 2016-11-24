@@ -23,63 +23,6 @@
 #include <cstddef>
 
 class WebSocketHandshake {
-    static inline uint32_t rol(uint32_t value, size_t bits) {return (value << bits) | (value >> (32 - bits));}
-    static inline uint32_t blk(uint32_t block[16], size_t i) {
-        return rol(block[(i + 13) & 15] ^ block[(i + 8) & 15] ^ block[(i + 2) & 15] ^ block[i], 1);
-    }
-
-    struct L1 {
-        template <int i>
-        static inline void f(uint32_t *vec, uint32_t *block) {
-            vec[i % 5] += ((vec[(3 + i) % 5] & (vec[(2 + i) % 5] ^ vec[(1 + i) % 5])) ^ vec[(1 + i) % 5]) + block[i] + 0x5a827999 + rol(vec[(4 + i) % 5], 5);
-            vec[(3 + i) % 5] = rol(vec[(3 + i) % 5], 30);
-        }
-    };
-
-    struct L2 {
-        template <int in>
-        static inline void f(uint32_t *vec, uint32_t *block) {
-            int i = in + 1;
-            block[i - 1] = blk(block, i - 1);
-            vec[i % 5] += ((vec[(3 + i) % 5] & (vec[(2 + i) % 5] ^ vec[(1 + i) % 5])) ^ vec[(1 + i) % 5]) + block[i - 1] + 0x5a827999 + rol(vec[(4 + i) % 5], 5);
-            vec[(3 + i) % 5] = rol(vec[(3 + i) % 5], 30);
-        }
-    };
-
-    struct L3 {
-        template <int i>
-        static inline void f(uint32_t *vec, uint32_t *block) {
-            block[(i + 4) % 16] = blk(block, (i + 4) % 16);
-            vec[i % 5] += (vec[(3 + i) % 5] ^ vec[(2 + i) % 5] ^ vec[(1 + i) % 5]) + block[(i + 4) % 16] + 0x6ed9eba1 + rol(vec[(4 + i) % 5], 5);
-            vec[(3 + i) % 5] = rol(vec[(3 + i) % 5], 30);
-        }
-    };
-
-    struct L4 {
-        template <int i>
-        static inline void f(uint32_t *vec, uint32_t *block) {
-            block[(i + 8) % 16] = blk(block, (i + 8) % 16);
-            vec[i % 5] += (((vec[(3 + i) % 5] | vec[(2 + i) % 5]) & vec[(1 + i) % 5]) | (vec[(3 + i) % 5] & vec[(2 + i) % 5])) + block[(i + 8) % 16] + 0x8f1bbcdc + rol(vec[(4 + i) % 5], 5);
-            vec[(3 + i) % 5] = rol(vec[(3 + i) % 5], 30);
-        }
-    };
-
-    struct L5 {
-        template <int i>
-        static inline void f(uint32_t *vec, uint32_t *block) {
-            block[(i + 12) % 16] = blk(block, (i + 12) % 16);
-            vec[i % 5] += (vec[(3 + i) % 5] ^ vec[(2 + i) % 5] ^ vec[(1 + i) % 5]) + block[(i + 12) % 16] + 0xca62c1d6 + rol(vec[(4 + i) % 5], 5);
-            vec[(3 + i) % 5] = rol(vec[(3 + i) % 5], 30);
-        }
-    };
-
-    struct L6 {
-        template <int i>
-        static inline void f(uint32_t *vec, uint32_t *digest) {
-            digest[i] += vec[4 - i];
-        }
-    };
-
     template <int N, typename T>
     struct static_for {
         void operator()(uint32_t *vec, uint32_t *digest) {
@@ -93,18 +36,57 @@ class WebSocketHandshake {
         void operator()(uint32_t *vec, uint32_t *digest) {}
     };
 
+    template <int state>
+    struct Sha1Loop {
+        static inline uint32_t rol(uint32_t value, size_t bits) {return (value << bits) | (value >> (32 - bits));}
+        static inline uint32_t blk(uint32_t block[16], size_t i) {
+            return rol(block[(i + 13) & 15] ^ block[(i + 8) & 15] ^ block[(i + 2) & 15] ^ block[i], 1);
+        }
+
+        template <int i>
+        static inline void f(uint32_t *vec, uint32_t *block) {
+            switch (state) {
+            case 1:
+                vec[i % 5] += ((vec[(3 + i) % 5] & (vec[(2 + i) % 5] ^ vec[(1 + i) % 5])) ^ vec[(1 + i) % 5]) + block[i] + 0x5a827999 + rol(vec[(4 + i) % 5], 5);
+                vec[(3 + i) % 5] = rol(vec[(3 + i) % 5], 30);
+                break;
+            case 2:
+                block[i] = blk(block, i);
+                vec[(1 + i) % 5] += ((vec[(4 + i) % 5] & (vec[(3 + i) % 5] ^ vec[(2 + i) % 5])) ^ vec[(2 + i) % 5]) + block[i] + 0x5a827999 + rol(vec[(5 + i) % 5], 5);
+                vec[(4 + i) % 5] = rol(vec[(4 + i) % 5], 30);
+                break;
+            case 3:
+                block[(i + 4) % 16] = blk(block, (i + 4) % 16);
+                vec[i % 5] += (vec[(3 + i) % 5] ^ vec[(2 + i) % 5] ^ vec[(1 + i) % 5]) + block[(i + 4) % 16] + 0x6ed9eba1 + rol(vec[(4 + i) % 5], 5);
+                vec[(3 + i) % 5] = rol(vec[(3 + i) % 5], 30);
+                break;
+            case 4:
+                block[(i + 8) % 16] = blk(block, (i + 8) % 16);
+                vec[i % 5] += (((vec[(3 + i) % 5] | vec[(2 + i) % 5]) & vec[(1 + i) % 5]) | (vec[(3 + i) % 5] & vec[(2 + i) % 5])) + block[(i + 8) % 16] + 0x8f1bbcdc + rol(vec[(4 + i) % 5], 5);
+                vec[(3 + i) % 5] = rol(vec[(3 + i) % 5], 30);
+                break;
+            case 5:
+                block[(i + 12) % 16] = blk(block, (i + 12) % 16);
+                vec[i % 5] += (vec[(3 + i) % 5] ^ vec[(2 + i) % 5] ^ vec[(1 + i) % 5]) + block[(i + 12) % 16] + 0xca62c1d6 + rol(vec[(4 + i) % 5], 5);
+                vec[(3 + i) % 5] = rol(vec[(3 + i) % 5], 30);
+                break;
+            case 6:
+                block[i] += vec[4 - i];
+            }
+        }
+    };
+
     static inline void sha1(uint32_t digest[5], uint32_t block[16]) {
         uint32_t vec[5] = {digest[4], digest[3], digest[2], digest[1], digest[0]};
-        static_for<16, L1>()(vec, block);
-        static_for<4, L2>()(vec, block);
-        static_for<20, L3>()(vec, block);
-        static_for<20, L4>()(vec, block);
-        static_for<20, L5>()(vec, block);
-        static_for<5, L6>()(vec, digest);
+        static_for<16, Sha1Loop<1>>()(vec, block);
+        static_for<4, Sha1Loop<2>>()(vec, block);
+        static_for<20, Sha1Loop<3>>()(vec, block);
+        static_for<20, Sha1Loop<4>>()(vec, block);
+        static_for<20, Sha1Loop<5>>()(vec, block);
+        static_for<5, Sha1Loop<6>>()(vec, digest);
     }
 
-    static inline void base64(unsigned char *src, char *dst)
-    {
+    static inline void base64(unsigned char *src, char *dst) {
         const char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         for (int i = 0; i < 18; i += 3) {
             *dst++ = b64[(src[i] >> 2) & 63];
